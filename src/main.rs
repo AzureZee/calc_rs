@@ -113,7 +113,7 @@ fn lexer_output() {
 }
 
 fn main() {
-    println!("type `exit` quit");
+    println!("Enter `exit` quit");
 
     loop {
         print!(">>> ");
@@ -143,7 +143,7 @@ fn eval_expr(output: Vec<Token>) -> Num {
                 if let Some(rhs) = eval_stack.pop()
                     && let Some(lhs) = eval_stack.pop()
                 {
-                    let value = eval(dbg!(op), dbg!(lhs), dbg!(rhs));
+                    let value = eval(dbg!(lhs), dbg!(op), dbg!(rhs));
                     dbg!(&eval_stack);
                     eval_stack.push(value);
                 }
@@ -227,7 +227,7 @@ impl OpInfo {
             || (self.precedence == other.precedence && self.associativity == Associativity::Left)
     }
 }
-fn eval(op: char, lhs: Num, rhs: Num) -> Num {
+fn eval(lhs: Num, op: char, rhs: Num) -> Num {
     match op {
         PLUS => lhs + rhs,
         MINUS => lhs - rhs,
