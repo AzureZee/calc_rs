@@ -1,4 +1,7 @@
-use std::ops::Not;
+use std::{
+    io::{BufRead, Write, stdin, stdout},
+    ops::Not,
+};
 type Num = f32;
 #[derive(Debug, Clone, PartialEq)]
 enum Token {
@@ -110,8 +113,48 @@ fn lexer_output() {
 }
 
 fn main() {
-    let input = "(1+11)/((-3-5)*4)";
-    let mut tokens = Lexer::new(input);
+    println!("type `exit` quit");
+
+    loop {
+        print!(">>> ");
+        stdout().flush().unwrap();
+        let buf = &mut String::new();
+        stdin().read_line(buf).unwrap();
+        if buf.trim() == "exit" {
+            break;
+        }
+        let tokens = Lexer::new(&buf);
+        let output = infix_to_rpn(tokens);
+        println!("{:?}", eval_expr(output));
+    }
+}
+// let input = "(1+11)/((-3-5)*4)";
+
+fn eval_expr(output: Vec<Token>) -> Num {
+    let mut eval_stack = vec![];
+    let mut iter = output.into_iter();
+    while let Some(ele) = iter.next() {
+        match ele {
+            Token::Number(n) => {
+                eval_stack.push(n);
+            }
+            Token::Op(op) => {
+                dbg!(&eval_stack);
+                if let Some(rhs) = eval_stack.pop()
+                    && let Some(lhs) = eval_stack.pop()
+                {
+                    let value = eval(dbg!(op), dbg!(lhs), dbg!(rhs));
+                    dbg!(&eval_stack);
+                    eval_stack.push(value);
+                }
+            }
+            _ => {}
+        }
+    }
+    dbg!(eval_stack[0])
+}
+
+fn infix_to_rpn(mut tokens: Lexer) -> Vec<Token> {
     let mut op_stack = vec![];
     let mut output = vec![];
     loop {
@@ -149,27 +192,7 @@ fn main() {
         }
     }
     println!("{:?}", output);
-    let mut eval_stack = vec![];
-    let mut iter = output.into_iter();
-    while let Some(ele) = iter.next() {
-        match ele {
-            Token::Number(n) => {
-                eval_stack.push(n);
-            }
-            Token::Op(op) => {
-                dbg!(&eval_stack);
-                if let Some(rhs) = eval_stack.pop()
-                    && let Some(lhs) = eval_stack.pop()
-                {
-                    let value = eval(dbg!(op), dbg!(lhs), dbg!(rhs));
-                    dbg!(&eval_stack);
-                    eval_stack.push(value);
-                }
-            }
-            _ => {}
-        }
-    }
-    dbg!(&eval_stack);
+    output
 }
 
 #[derive(Default, PartialEq)]
@@ -189,13 +212,13 @@ impl OpInfo {
     fn new(op: char) -> Self {
         match op {
             PLUS | MINUS => Self {
-            precedence: 10,
-            associativity: Associativity::Left,
-        },
+                precedence: 10,
+                associativity: Associativity::Left,
+            },
             MUL | DIV => Self {
-            precedence: 20,
-            associativity: Associativity::Left,
-        },
+                precedence: 20,
+                associativity: Associativity::Left,
+            },
             _ => Self::default(),
         }
     }
