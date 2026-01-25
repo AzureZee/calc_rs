@@ -1,5 +1,5 @@
 use std::{
-    io::{BufRead, Write, stdin, stdout},
+    io::{Write, stdin, stdout},
     ops::Not,
 };
 type Num = f32;
@@ -16,7 +16,6 @@ enum Token {
 #[derive(Debug)]
 struct Lexer {
     tokens: Vec<Token>,
-    // chars: Vec<char>,
 }
 const LP: char = '(';
 const RP: char = ')';
@@ -27,7 +26,7 @@ const DIV: char = '/';
 const POW: char = '^';
 type LexerResult = Result<Lexer, String>;
 impl Lexer {
-    fn new(input: &str) -> LexerResult {
+    fn scan(input: &str) -> LexerResult {
         let chars = input
             .chars()
             .filter(|input_char| input_char.is_ascii_whitespace().not())
@@ -115,7 +114,7 @@ fn is_letter(this: char) -> bool {
 #[test]
 fn lexer_output() {
     let input = "--5*((-1.0 + -22) * _a1_3) - bc2 / c";
-    println!("{:?}", Lexer::new(input));
+    println!("{:?}", Lexer::scan(input));
 }
 
 fn main() {
@@ -129,10 +128,10 @@ fn main() {
         if buf.trim() == "bye" {
             break;
         }
-        match Lexer::new(&buf) {
-            Ok(tokens) => {
-                let output = infix_to_rpn(tokens);
-                match eval_expr(output) {
+        match Lexer::scan(&buf) {
+            Ok(infix_expr) => {
+                let rpn_expr = infix_to_rpn(infix_expr);
+                match eval(rpn_expr) {
                     Ok(res) => {
                         println!("{:?}", res);
                     }
@@ -147,13 +146,13 @@ fn main() {
         };
     }
 }
-// let input = "(1+11)/((-3-5)*4)";
+
 type EvalResult = Result<Num, String>;
-fn eval_expr(output: Vec<Token>) -> EvalResult {
+fn eval(rpn_expr: Vec<Token>) -> EvalResult {
     let mut eval_stack = vec![];
-    let mut iter = output.into_iter();
+    let mut expr = rpn_expr.into_iter();
     let err_info = "invalid expr".to_string();
-    while let Some(ele) = iter.next() {
+    while let Some(ele) = expr.next() {
         match ele {
             Token::Number(n) => {
                 eval_stack.push(n);
@@ -164,7 +163,7 @@ fn eval_expr(output: Vec<Token>) -> EvalResult {
                     && let Some(lhs) = eval_stack.pop()
                 {
                     dbg!(&eval_stack);
-                    let value = eval(dbg!(lhs), dbg!(op), dbg!(rhs));
+                    let value = eval_expr(dbg!(lhs), dbg!(op), dbg!(rhs));
                     eval_stack.push(value);
                 } else {
                     return Err(err_info);
@@ -178,7 +177,7 @@ fn eval_expr(output: Vec<Token>) -> EvalResult {
         None => Err(err_info),
     }
 }
-fn eval(lhs: Num, op: char, rhs: Num) -> Num {
+fn eval_expr(lhs: Num, op: char, rhs: Num) -> Num {
     match op {
         PLUS => lhs + rhs,
         MINUS => lhs - rhs,
