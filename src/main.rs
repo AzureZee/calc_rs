@@ -46,7 +46,8 @@ impl Lexer {
                     tokens.push(Token::Op(this));
                 }
                 MINUS => {
-                    if let Some(back) = chars.get(i - 2)
+                    if i > 1
+                        && let Some(back) = chars.get(i - 2)
                         && (back.is_ascii_digit() || is_letter(*back) || *back == RP)
                     {
                         tokens.push(Token::Op(this));
@@ -108,7 +109,7 @@ fn is_letter(this: char) -> bool {
 }
 #[test]
 fn lexer_output() {
-    let input = "((-1.0 + -22) * _a1_3) - bc2 / c";
+    let input = "--5*((-1.0 + -22) * _a1_3) - bc2 / c";
     println!("{:?}", Lexer::new(input).tokens);
 }
 
