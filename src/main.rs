@@ -13,6 +13,7 @@ enum Token {
     Eof,
 }
 
+#[derive(Debug)]
 struct Lexer {
     tokens: Vec<Token>,
     // chars: Vec<char>,
@@ -23,8 +24,9 @@ const PLUS: char = '+';
 const MINUS: char = '-';
 const MUL: char = '*';
 const DIV: char = '/';
+type LexerResult = Result<Lexer, String>;
 impl Lexer {
-    fn new(input: &str) -> Self {
+    fn new(input: &str) -> LexerResult {
         let chars = input
             .chars()
             .filter(|input_char| input_char.is_ascii_whitespace().not())
@@ -42,8 +44,20 @@ impl Lexer {
                 RP => {
                     tokens.push(Token::RParen);
                 }
-                PLUS | MUL | DIV => {
+                MUL | DIV => {
                     tokens.push(Token::Op(this));
+                }
+                PLUS => {
+                    if i > 1
+                        && let Some(back) = chars.get(i - 2)
+                        && (back.is_ascii_digit() || is_letter(*back) || *back == RP)
+                    {
+                        tokens.push(Token::Op(this));
+                    } else {
+                        buf.push(this);
+                        let num = read_number(&chars, &mut i, &mut buf)?;
+                        tokens.push(Token::Number(num));
+                    }
                 }
                 MINUS => {
                     if i > 1
@@ -53,28 +67,13 @@ impl Lexer {
                         tokens.push(Token::Op(this));
                     } else {
                         buf.push(this);
-                        while i < chars.len()
-                            && let next = chars[i]
-                            && (next.is_ascii_digit() || next == '.')
-                        {
-                            buf.push(next);
-                            i += 1;
-                        }
-                        let num = buf.clone().parse::<Num>().unwrap();
+                        let num = read_number(&chars, &mut i, &mut buf)?;
                         tokens.push(Token::Number(num));
                     }
                 }
                 this if this.is_ascii_digit() => {
                     buf.push(this);
-
-                    while i < chars.len()
-                        && let next = chars[i]
-                        && (next.is_ascii_digit() || next == '.')
-                    {
-                        buf.push(next);
-                        i += 1;
-                    }
-                    let num = buf.clone().parse::<Num>().unwrap();
+                    let num = read_number(&chars, &mut i, &mut buf)?;
                     tokens.push(Token::Number(num));
                 }
                 this if is_letter(this) => {
@@ -89,11 +88,13 @@ impl Lexer {
                     }
                     tokens.push(Token::Variable(buf.clone()));
                 }
-                _ => {}
+                other @ _ => {
+                    return Err(format!("invalid char: {other}"));
+                }
             }
         }
         tokens.reverse();
-        Self { tokens }
+        Ok(Self { tokens })
     }
 
     fn next(&mut self) -> Token {
@@ -103,6 +104,20 @@ impl Lexer {
     //     self.tokens.last().copied().unwrap_or(Token::Eof)
     // }
 }
+type PraseResult = Result<Num, String>;
+fn read_number(chars: &Vec<char>, i: &mut usize, buf: &mut String) -> PraseResult {
+    fn stringify(buf: &str) -> String {
+        format!("invalid number: {buf}")
+    }
+    while *i < chars.len()
+        && let next = chars[*i]
+        && (next.is_ascii_digit() || next == '.')
+    {
+        buf.push(next);
+        *i += 1;
+    }
+    buf.clone().parse::<Num>().map_err(|_| stringify(&buf))
+}
 
 fn is_letter(this: char) -> bool {
     this.is_ascii_alphabetic() || this == '_'
@@ -110,30 +125,44 @@ fn is_letter(this: char) -> bool {
 #[test]
 fn lexer_output() {
     let input = "--5*((-1.0 + -22) * _a1_3) - bc2 / c";
-    println!("{:?}", Lexer::new(input).tokens);
+    println!("{:?}", Lexer::new(input));
 }
 
 fn main() {
-    println!("Enter `exit` quit");
+    println!("Enter `bye` exit");
 
     loop {
         print!(">>> ");
         stdout().flush().unwrap();
         let buf = &mut String::new();
         stdin().read_line(buf).unwrap();
-        if buf.trim() == "exit" {
+        if buf.trim() == "bye" {
             break;
         }
-        let tokens = Lexer::new(&buf);
-        let output = infix_to_rpn(tokens);
-        println!("{:?}", eval_expr(output));
+        match Lexer::new(&buf) {
+            Ok(tokens) => {
+                let output = infix_to_rpn(tokens);
+                match eval_expr(output) {
+                    Ok(res) => {
+                        println!("{:?}", res);
+                    }
+                    Err(err) => {
+                        eprintln!("{:?}", err);
+                    }
+                };
+            }
+            Err(err) => {
+                eprintln!("{:?}", err);
+            }
+        };
     }
 }
 // let input = "(1+11)/((-3-5)*4)";
-
-fn eval_expr(output: Vec<Token>) -> Num {
+type EvalResult = Result<Num, String>;
+fn eval_expr(output: Vec<Token>) -> EvalResult {
     let mut eval_stack = vec![];
     let mut iter = output.into_iter();
+    let err_info = "invalid expr".to_string();
     while let Some(ele) = iter.next() {
         match ele {
             Token::Number(n) => {
@@ -147,14 +176,27 @@ fn eval_expr(output: Vec<Token>) -> Num {
                     let value = eval(dbg!(lhs), dbg!(op), dbg!(rhs));
                     dbg!(&eval_stack);
                     eval_stack.push(value);
+                } else {
+                    return Err(err_info);
                 }
             }
             _ => {}
         }
     }
-    dbg!(eval_stack[0])
+    match eval_stack.get(0) {
+        Some(res) => Ok(*res),
+        None => Err(err_info),
+    }
 }
-
+fn eval(lhs: Num, op: char, rhs: Num) -> Num {
+    match op {
+        PLUS => lhs + rhs,
+        MINUS => lhs - rhs,
+        MUL => lhs * rhs,
+        DIV => lhs / rhs,
+        _ => 0.0,
+    }
+}
 fn infix_to_rpn(mut tokens: Lexer) -> Vec<Token> {
     let mut op_stack = vec![];
     let mut output = vec![];
@@ -226,14 +268,5 @@ impl OpInfo {
     fn should_pop(&self, other: OpInfo) -> bool {
         self.precedence > other.precedence
             || (self.precedence == other.precedence && self.associativity == Associativity::Left)
-    }
-}
-fn eval(lhs: Num, op: char, rhs: Num) -> Num {
-    match op {
-        PLUS => lhs + rhs,
-        MINUS => lhs - rhs,
-        MUL => lhs * rhs,
-        DIV => lhs / rhs,
-        _ => 0.0,
     }
 }
