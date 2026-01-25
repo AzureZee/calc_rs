@@ -25,9 +25,9 @@ fn main() {
         if buf.trim() == "bye" {
             break;
         }
-        match Lexer::scan(&buf) {
-            Ok(mut infix_expr) => {
-                let rpn_expr = infix_expr.to_rpn();
+        match Lexer::scan(buf) {
+            Ok(infix_expr) => {
+                let rpn_expr = infix_expr.into_rpn();
                 match eval(rpn_expr) {
                     Ok(res) => {
                         println!("{:?}", res);
@@ -100,7 +100,7 @@ impl Lexer {
                     }
                     tokens.push(Token::Variable(buf.clone()));
                 }
-                other @ _ => {
+                other => {
                     return Err(format!("invalid char: {other}"));
                 }
             }
@@ -109,7 +109,7 @@ impl Lexer {
         Ok(Self { tokens })
     }
 
-    fn to_rpn(&mut self) -> Vec<Token> {
+    fn into_rpn(mut self) -> Vec<Token> {
         let mut op_stack = vec![];
         // Reverse Polish Notation (RPN)
         let mut rpn = vec![];
@@ -166,7 +166,7 @@ enum Token {
     RParen,
     Eof,
 }
-fn read_number(chars: &Vec<char>, i: &mut usize, buf: &mut String) -> PraseResult {
+fn read_number(chars: &[char], i: &mut usize, buf: &mut String) -> PraseResult {
     fn stringify(buf: &str) -> String {
         format!("invalid number: {buf}")
     }
@@ -177,7 +177,7 @@ fn read_number(chars: &Vec<char>, i: &mut usize, buf: &mut String) -> PraseResul
         buf.push(next);
         *i += 1;
     }
-    buf.clone().parse::<Num>().map_err(|_| stringify(&buf))
+    buf.clone().parse::<Num>().map_err(|_| stringify(buf))
 }
 
 fn is_letter(this: char) -> bool {
@@ -186,9 +186,9 @@ fn is_letter(this: char) -> bool {
 
 fn eval(rpn_expr: Vec<Token>) -> EvalResult {
     let mut eval_stack = vec![];
-    let mut expr = rpn_expr.into_iter();
+    let expr = rpn_expr.into_iter();
     let err_info = "invalid expr".to_string();
-    while let Some(ele) = expr.next() {
+    for ele in expr {
         match ele {
             Token::Number(n) => {
                 eval_stack.push(n);
@@ -208,7 +208,7 @@ fn eval(rpn_expr: Vec<Token>) -> EvalResult {
             _ => {}
         }
     }
-    match eval_stack.get(0) {
+    match eval_stack.first() {
         Some(res) => Ok(*res),
         None => Err(err_info),
     }
