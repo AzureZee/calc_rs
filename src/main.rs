@@ -24,6 +24,7 @@ const PLUS: char = '+';
 const MINUS: char = '-';
 const MUL: char = '*';
 const DIV: char = '/';
+const POW: char = '^';
 type LexerResult = Result<Lexer, String>;
 impl Lexer {
     fn new(input: &str) -> LexerResult {
@@ -44,7 +45,7 @@ impl Lexer {
                 RP => {
                     tokens.push(Token::RParen);
                 }
-                MUL | DIV => {
+                MUL | DIV | POW => {
                     tokens.push(Token::Op(this));
                 }
 
@@ -162,8 +163,8 @@ fn eval_expr(output: Vec<Token>) -> EvalResult {
                 if let Some(rhs) = eval_stack.pop()
                     && let Some(lhs) = eval_stack.pop()
                 {
-                    let value = eval(dbg!(lhs), dbg!(op), dbg!(rhs));
                     dbg!(&eval_stack);
+                    let value = eval(dbg!(lhs), dbg!(op), dbg!(rhs));
                     eval_stack.push(value);
                 } else {
                     return Err(err_info);
@@ -183,6 +184,7 @@ fn eval(lhs: Num, op: char, rhs: Num) -> Num {
         MINUS => lhs - rhs,
         MUL => lhs * rhs,
         DIV => lhs / rhs,
+        POW => lhs.powf(rhs),
         _ => 0.0,
     }
 }
@@ -250,6 +252,10 @@ impl OpInfo {
             MUL | DIV => Self {
                 precedence: 20,
                 associativity: Associativity::Left,
+            },
+            POW => Self {
+                precedence: 30,
+                associativity: Associativity::Right,
             },
             _ => Self::default(),
         }
