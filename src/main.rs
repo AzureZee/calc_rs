@@ -108,13 +108,15 @@ impl Lexer {
         tokens.reverse();
         Ok(Self { tokens })
     }
+
     fn to_rpn(&mut self) -> Vec<Token> {
         let mut op_stack = vec![];
-        let mut output = vec![];
+        // Reverse Polish Notation (RPN)
+        let mut rpn = vec![];
         loop {
             match self.next() {
-                n @ Token::Number(_) => {
-                    output.push(n);
+                num @ Token::Number(_) => {
+                    rpn.push(num);
                 }
                 lp @ Token::LParen => {
                     op_stack.push(lp);
@@ -123,30 +125,30 @@ impl Lexer {
                     while let Some(op) = op_stack.pop()
                         && op != Token::LParen
                     {
-                        output.push(op);
+                        rpn.push(op);
                     }
                 }
                 Token::Op(incoming_op) => {
                     if let Some(Token::Op(top_op)) = op_stack.last()
-                        && OpInfo::new(*top_op).should_pop(OpInfo::new(incoming_op))
+                        && OpInfo::of(*top_op).should_pop(OpInfo::of(incoming_op))
                     {
                         let tmp = op_stack.pop().unwrap();
                         op_stack.push(Token::Op(incoming_op));
-                        output.push(tmp);
+                        rpn.push(tmp);
                     } else {
                         op_stack.push(Token::Op(incoming_op));
                     }
                 }
                 Token::Eof => {
                     op_stack.reverse();
-                    output.extend(op_stack);
+                    rpn.extend(op_stack);
                     break;
                 }
                 _ => {}
             }
         }
-        println!("{:?}", output);
-        output
+        println!("{:?}", rpn);
+        rpn
     }
     fn next(&mut self) -> Token {
         self.tokens.pop().unwrap_or(Token::Eof)
@@ -221,7 +223,6 @@ fn eval_expr(lhs: Num, op: char, rhs: Num) -> Num {
         _ => 0.0,
     }
 }
-// Reverse Polish Notation (RPN)
 
 #[derive(Default, PartialEq)]
 enum Associativity {
@@ -237,7 +238,7 @@ struct OpInfo {
 }
 
 impl OpInfo {
-    fn new(op: char) -> Self {
+    fn of(op: char) -> Self {
         match op {
             PLUS | MINUS => Self {
                 precedence: 10,
