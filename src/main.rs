@@ -47,19 +47,8 @@ impl Lexer {
                 MUL | DIV => {
                     tokens.push(Token::Op(this));
                 }
-                PLUS => {
-                    if i > 1
-                        && let Some(back) = chars.get(i - 2)
-                        && (back.is_ascii_digit() || is_letter(*back) || *back == RP)
-                    {
-                        tokens.push(Token::Op(this));
-                    } else {
-                        buf.push(this);
-                        let num = read_number(&chars, &mut i, &mut buf)?;
-                        tokens.push(Token::Number(num));
-                    }
-                }
-                MINUS => {
+
+                PLUS | MINUS => {
                     if i > 1
                         && let Some(back) = chars.get(i - 2)
                         && (back.is_ascii_digit() || is_letter(*back) || *back == RP)
