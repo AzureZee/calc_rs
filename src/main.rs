@@ -3,20 +3,9 @@ use std::{
     ops::Not,
 };
 type Num = f32;
-#[derive(Debug, Clone, PartialEq)]
-enum Token {
-    Variable(String),
-    Number(Num),
-    Op(char),
-    LParen,
-    RParen,
-    Eof,
-}
-
-#[derive(Debug)]
-struct Lexer {
-    tokens: Vec<Token>,
-}
+type LexerResult = Result<Lexer, String>;
+type PraseResult = Result<Num, String>;
+type EvalResult = Result<Num, String>;
 const LP: char = '(';
 const RP: char = ')';
 const PLUS: char = '+';
@@ -24,7 +13,41 @@ const MINUS: char = '-';
 const MUL: char = '*';
 const DIV: char = '/';
 const POW: char = '^';
-type LexerResult = Result<Lexer, String>;
+
+fn main() {
+    println!("Enter `bye` exit");
+
+    loop {
+        print!(">>> ");
+        stdout().flush().unwrap();
+        let buf = &mut String::new();
+        stdin().read_line(buf).unwrap();
+        if buf.trim() == "bye" {
+            break;
+        }
+        match Lexer::scan(&buf) {
+            Ok(mut infix_expr) => {
+                let rpn_expr = infix_expr.to_rpn();
+                match eval(rpn_expr) {
+                    Ok(res) => {
+                        println!("{:?}", res);
+                    }
+                    Err(err) => {
+                        eprintln!("{:?}", err);
+                    }
+                };
+            }
+            Err(err) => {
+                eprintln!("{:?}", err);
+            }
+        };
+    }
+}
+
+#[derive(Debug)]
+struct Lexer {
+    tokens: Vec<Token>,
+}
 impl Lexer {
     fn scan(input: &str) -> LexerResult {
         let chars = input
@@ -85,7 +108,46 @@ impl Lexer {
         tokens.reverse();
         Ok(Self { tokens })
     }
-
+    fn to_rpn(&mut self) -> Vec<Token> {
+        let mut op_stack = vec![];
+        let mut output = vec![];
+        loop {
+            match self.next() {
+                n @ Token::Number(_) => {
+                    output.push(n);
+                }
+                lp @ Token::LParen => {
+                    op_stack.push(lp);
+                }
+                Token::RParen => {
+                    while let Some(op) = op_stack.pop()
+                        && op != Token::LParen
+                    {
+                        output.push(op);
+                    }
+                }
+                Token::Op(incoming_op) => {
+                    if let Some(Token::Op(top_op)) = op_stack.last()
+                        && OpInfo::new(*top_op).should_pop(OpInfo::new(incoming_op))
+                    {
+                        let tmp = op_stack.pop().unwrap();
+                        op_stack.push(Token::Op(incoming_op));
+                        output.push(tmp);
+                    } else {
+                        op_stack.push(Token::Op(incoming_op));
+                    }
+                }
+                Token::Eof => {
+                    op_stack.reverse();
+                    output.extend(op_stack);
+                    break;
+                }
+                _ => {}
+            }
+        }
+        println!("{:?}", output);
+        output
+    }
     fn next(&mut self) -> Token {
         self.tokens.pop().unwrap_or(Token::Eof)
     }
@@ -93,7 +155,15 @@ impl Lexer {
     //     self.tokens.last().copied().unwrap_or(Token::Eof)
     // }
 }
-type PraseResult = Result<Num, String>;
+#[derive(Debug, Clone, PartialEq)]
+enum Token {
+    Variable(String),
+    Number(Num),
+    Op(char),
+    LParen,
+    RParen,
+    Eof,
+}
 fn read_number(chars: &Vec<char>, i: &mut usize, buf: &mut String) -> PraseResult {
     fn stringify(buf: &str) -> String {
         format!("invalid number: {buf}")
@@ -111,43 +181,7 @@ fn read_number(chars: &Vec<char>, i: &mut usize, buf: &mut String) -> PraseResul
 fn is_letter(this: char) -> bool {
     this.is_ascii_alphabetic() || this == '_'
 }
-#[test]
-fn lexer_output() {
-    let input = "--5*((-1.0 + -22) * _a1_3) - bc2 / c";
-    println!("{:?}", Lexer::scan(input));
-}
 
-fn main() {
-    println!("Enter `bye` exit");
-
-    loop {
-        print!(">>> ");
-        stdout().flush().unwrap();
-        let buf = &mut String::new();
-        stdin().read_line(buf).unwrap();
-        if buf.trim() == "bye" {
-            break;
-        }
-        match Lexer::scan(&buf) {
-            Ok(infix_expr) => {
-                let rpn_expr = infix_to_rpn(infix_expr);
-                match eval(rpn_expr) {
-                    Ok(res) => {
-                        println!("{:?}", res);
-                    }
-                    Err(err) => {
-                        eprintln!("{:?}", err);
-                    }
-                };
-            }
-            Err(err) => {
-                eprintln!("{:?}", err);
-            }
-        };
-    }
-}
-
-type EvalResult = Result<Num, String>;
 fn eval(rpn_expr: Vec<Token>) -> EvalResult {
     let mut eval_stack = vec![];
     let mut expr = rpn_expr.into_iter();
@@ -187,46 +221,7 @@ fn eval_expr(lhs: Num, op: char, rhs: Num) -> Num {
         _ => 0.0,
     }
 }
-fn infix_to_rpn(mut tokens: Lexer) -> Vec<Token> {
-    let mut op_stack = vec![];
-    let mut output = vec![];
-    loop {
-        match tokens.next() {
-            n @ Token::Number(_) => {
-                output.push(n);
-            }
-            lp @ Token::LParen => {
-                op_stack.push(lp);
-            }
-            Token::RParen => {
-                while let Some(op) = op_stack.pop()
-                    && op != Token::LParen
-                {
-                    output.push(op);
-                }
-            }
-            Token::Op(incoming_op) => {
-                if let Some(Token::Op(top_op)) = op_stack.last()
-                    && OpInfo::new(*top_op).should_pop(OpInfo::new(incoming_op))
-                {
-                    let tmp = op_stack.pop().unwrap();
-                    op_stack.push(Token::Op(incoming_op));
-                    output.push(tmp);
-                } else {
-                    op_stack.push(Token::Op(incoming_op));
-                }
-            }
-            Token::Eof => {
-                op_stack.reverse();
-                output.extend(op_stack);
-                break;
-            }
-            _ => {}
-        }
-    }
-    println!("{:?}", output);
-    output
-}
+// Reverse Polish Notation (RPN)
 
 #[derive(Default, PartialEq)]
 enum Associativity {
@@ -263,4 +258,10 @@ impl OpInfo {
         self.precedence > other.precedence
             || (self.precedence == other.precedence && self.associativity == Associativity::Left)
     }
+}
+
+#[test]
+fn lexer_output() {
+    let input = "--5*((-1.0 + -22) * _a1_3) - bc2 / c";
+    println!("{:?}", Lexer::scan(input));
 }
