@@ -13,19 +13,20 @@ const MINUS: char = '-';
 const MUL: char = '*';
 const DIV: char = '/';
 const POW: char = '^';
+const MOD: char = '%';
 
 fn main() {
     println!("Enter `bye` exit");
 
+    let input = &mut String::new();
     loop {
         print!(">>> ");
         stdout().flush().unwrap();
-        let buf = &mut String::new();
-        stdin().read_line(buf).unwrap();
-        if buf.trim() == "bye" {
+        stdin().read_line(input).unwrap();
+        if input.trim() == "bye" {
             break;
         }
-        match Lexer::scan(buf) {
+        match Lexer::scan(input) {
             Ok(infix_expr) => {
                 let rpn_expr = infix_expr.into_rpn();
                 match eval(rpn_expr) {
@@ -41,6 +42,7 @@ fn main() {
                 eprintln!("{:?}", err);
             }
         };
+        input.clear();
     }
 }
 
@@ -67,7 +69,7 @@ impl Lexer {
                 RP => {
                     tokens.push(Token::RParen);
                 }
-                MUL | DIV | POW => {
+                MUL | DIV | POW | MOD => {
                     tokens.push(Token::Op(this));
                 }
 
@@ -100,8 +102,8 @@ impl Lexer {
                     }
                     tokens.push(Token::Variable(buf.clone()));
                 }
-                other => {
-                    return Err(format!("invalid char: {other}"));
+                _other => {
+                    // nothing
                 }
             }
         }
@@ -219,6 +221,7 @@ fn eval_expr(lhs: Num, op: char, rhs: Num) -> Num {
         MINUS => lhs - rhs,
         MUL => lhs * rhs,
         DIV => lhs / rhs,
+        MOD => lhs % rhs,
         POW => lhs.powf(rhs),
         _ => 0.0,
     }
@@ -244,7 +247,7 @@ impl OpInfo {
                 precedence: 10,
                 associativity: Associativity::Left,
             },
-            MUL | DIV => Self {
+            MUL | DIV | MOD => Self {
                 precedence: 20,
                 associativity: Associativity::Left,
             },
