@@ -2,7 +2,7 @@ use std::{
     io::{Write, stdin, stdout},
     ops::Not,
 };
-type Num = f32;
+type Num = f64;
 type LexerResult = Result<Lexer, String>;
 type PraseResult = Result<Num, String>;
 type EvalResult = Result<Num, String>;
@@ -16,14 +16,13 @@ const POW: char = '^';
 const MOD: char = '%';
 
 fn main() {
-    println!("Enter `bye` exit");
-
+    println!("Enter `qwq` exit");
     let input = &mut String::new();
     loop {
         print!(">>> ");
         stdout().flush().unwrap();
         stdin().read_line(input).unwrap();
-        if input.trim() == "bye" {
+        if input.trim() == "qwq" {
             break;
         }
         match Lexer::scan(input) {
@@ -149,7 +148,7 @@ impl Lexer {
                 _ => {}
             }
         }
-        println!("{:?}", rpn);
+        // println!("{:?}", rpn);
         rpn
     }
     fn next(&mut self) -> Token {
@@ -169,9 +168,6 @@ enum Token {
     Eof,
 }
 fn read_number(chars: &[char], i: &mut usize, buf: &mut String) -> PraseResult {
-    fn stringify(buf: &str) -> String {
-        format!("invalid number: {buf}")
-    }
     while *i < chars.len()
         && let next = chars[*i]
         && (next.is_ascii_digit() || next == '.')
@@ -179,7 +175,9 @@ fn read_number(chars: &[char], i: &mut usize, buf: &mut String) -> PraseResult {
         buf.push(next);
         *i += 1;
     }
-    buf.clone().parse::<Num>().map_err(|_| stringify(buf))
+    buf.clone()
+        .parse::<Num>()
+        .map_err(|_| format!("invalid number: {buf}"))
 }
 
 fn is_letter(this: char) -> bool {
@@ -196,12 +194,13 @@ fn eval(rpn_expr: Vec<Token>) -> EvalResult {
                 eval_stack.push(n);
             }
             Token::Op(op) => {
-                dbg!(&eval_stack);
+                // dbg!(&eval_stack);
                 if let Some(rhs) = eval_stack.pop()
                     && let Some(lhs) = eval_stack.pop()
                 {
-                    dbg!(&eval_stack);
-                    let value = eval_expr(dbg!(lhs), dbg!(op), dbg!(rhs));
+                    // dbg!(&eval_stack);
+                    let value = eval_expr(lhs, op, rhs)?;
+                    // let value = eval_expr(dbg!(lhs), dbg!(op), dbg!(rhs));
                     eval_stack.push(value);
                 } else {
                     return Err(err_info);
@@ -215,16 +214,31 @@ fn eval(rpn_expr: Vec<Token>) -> EvalResult {
         None => Err(err_info),
     }
 }
-fn eval_expr(lhs: Num, op: char, rhs: Num) -> Num {
-    match op {
+fn eval_expr(lhs: Num, op: char, rhs: Num) -> EvalResult {
+    let f_err = || {
+        format!("division by zero: {}{}{}", lhs, op, rhs)
+    };
+
+    let res = match op {
         PLUS => lhs + rhs,
         MINUS => lhs - rhs,
         MUL => lhs * rhs,
-        DIV => lhs / rhs,
-        MOD => lhs % rhs,
+        DIV => {
+            if rhs == 0.0 {
+                return Err(f_err());
+            }
+            lhs / rhs
+        }
+        MOD => {
+            if rhs == 0.0 {
+                return Err(f_err());
+            }
+            lhs % rhs
+        }
         POW => lhs.powf(rhs),
         _ => 0.0,
-    }
+    };
+    Ok(res)
 }
 
 #[derive(Default, PartialEq)]
