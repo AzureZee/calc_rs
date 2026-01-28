@@ -22,8 +22,10 @@ fn main() {
         print!(">>> ");
         stdout().flush().unwrap();
         stdin().read_line(input).unwrap();
-        if input.trim() == "qwq" {
-            break;
+        match input.trim() {
+            "qwq" => break,
+            "" => continue,
+            _ => {}
         }
         match Lexer::scan(input) {
             Ok(infix_expr) => {
@@ -215,9 +217,7 @@ fn eval(rpn_expr: Vec<Token>) -> EvalResult {
     }
 }
 fn eval_expr(lhs: Num, op: char, rhs: Num) -> EvalResult {
-    let f_err = || {
-        format!("division by zero: {}{}{}", lhs, op, rhs)
-    };
+    let f_err = || format!("division by zero: {}{}{}", lhs, op, rhs);
 
     let res = match op {
         PLUS => lhs + rhs,
